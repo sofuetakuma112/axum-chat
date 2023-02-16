@@ -30,10 +30,10 @@ impl IntoResponse for CustomError {
             CustomError::CannotEncodeToken(_) => {
                 (StatusCode::INTERNAL_SERVER_ERROR, "Token encode error")
             }
-            CustomError::UserNotFound => (StatusCode::UNPROCESSABLE_ENTITY, "User not found"),
+            CustomError::UserNotFound => (StatusCode::UNPROCESSABLE_ENTITY, "ユーザは存在しません。"),
         };
         let body = Json(json!({
-            "error": error_message,
+            "message": error_message,
         }));
         (status, body).into_response()
     }

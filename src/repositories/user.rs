@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use axum::async_trait;
-use sqlx::{PgPool, Pool, Postgres};
+use sqlx::PgPool;
 
 use crate::entities::user::User;
 

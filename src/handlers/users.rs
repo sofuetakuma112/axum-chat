@@ -44,9 +44,9 @@ pub async fn signup(
     let jwt = create_token(&saved_user)?;
 
     Ok((
-        StatusCode::OK,
+        StatusCode::CREATED,
         [(header::SET_COOKIE, jwt.cookie())],
-        "アカウント新規作成 & ログイン成功",
+        "ユーザが作成されました。",
     ))
 }
 
@@ -66,12 +66,20 @@ pub async fn login(
         Ok((
             StatusCode::OK,
             [(header::SET_COOKIE, jwt.cookie())],
-            "アカウント新規作成 & ログイン成功",
+            "ログインに成功しました。",
         ))
     } else {
-        // INTERNAL SERVER ERROR
-        unimplemented!()
+        Err(CustomError::UserNotFound)
     }
+}
+
+#[axum_macros::debug_handler]
+pub async fn logout(_: Claims) -> impl IntoResponse {
+    (
+        StatusCode::OK,
+        [(header::SET_COOKIE, JWT::clear_cookie())],
+        "ログアウト処理が完了しました。",
+    )
 }
 
 fn create_token(user: &UserEntity) -> Result<JWT, CustomError> {
@@ -106,31 +114,3 @@ pub struct SignUpPayload {
     password: String,
     display_name: String,
 }
-
-// #[derive(Debug, Serialize)]
-// pub struct AuthBody {
-//     access_token: String,
-//     token_type: String,
-// }
-
-// impl AuthBody {
-//     pub fn new(access_token: String) -> Self {
-//         Self {
-//             access_token,
-//             token_type: "Bearer".to_string(),
-//         }
-//     }
-// }
-
-// fn redirect_with_session(
-//     session: Option<SessionToken>,
-// ) -> Result<impl IntoResponse, impl IntoResponse> {
-//     if let Some(session_token) = session {
-//         let headers = Headers(vec![("Set-Cookie", session_token.cookie())]);
-//         let response = Redirect::to(Uri::from_static("/"));
-//         // <T: IntoResponse> (Headers, T) 型も IntoResponse を実装しています。
-//         Ok((headers, response)) // レスポンスヘッダ付きでリダイレクトさせるときはタプルで書く？
-//     } else {
-//         Err(Redirect::to(Uri::from_static("/login?error=invalid"))) // ログインページを再度表示
-//     }
-// }

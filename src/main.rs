@@ -59,6 +59,7 @@ async fn main() {
         .route("/api/auth/user", get(users::get_user))
         .route("/api/auth/signup", post(users::signup))
         .route("/api/auth/login", post(users::login))
+        .route("/api/auth/logout", get(users::logout))
         .with_state(shared_state); // 受信するすべてのリクエストのExtensionにオブジェクトを挿入するミドルウェアを追加
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));

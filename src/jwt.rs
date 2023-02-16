@@ -9,15 +9,12 @@ impl JWT {
         }
     }
 
-    // pub fn clear() -> JWT {
-    //     JWT {
-    //         token: "deleted".to_string(),
-    //     }
-    // }
-}
-
-impl JWT {
     pub fn cookie(&self) -> String {
-        format!("token={}; Path=/; HttpOnly", self.token)
+        // TODO: max-ageを反映する
+        format!("token={}; HttpOnly", self.token)
+    }
+
+    pub fn clear_cookie() -> String {
+        "token=; HttpOnly; Max-Age=0".to_string()
     }
 }
