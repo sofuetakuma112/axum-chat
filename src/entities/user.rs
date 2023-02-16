@@ -1,6 +1,7 @@
+use serde::Serialize;
 use sha2::{Digest, Sha256};
 
-#[derive(sqlx::FromRow)]
+#[derive(sqlx::FromRow, Serialize)]
 pub struct User {
     pub id: Option<i32>,
     pub email: String,

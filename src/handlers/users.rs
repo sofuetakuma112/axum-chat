@@ -3,19 +3,28 @@ use std::sync::Arc;
 use axum::{
     extract::{self, State},
     http::{header, StatusCode},
-    response::IntoResponse,
+    response::{self, IntoResponse},
 };
 use jsonwebtoken::{encode, Header};
 use serde::Deserialize;
 use validator::Validate;
 
 use crate::{
-    entities::user::User,
-    errors::CustomError,
-    repositories::user::UserRepository,
-    request::Claims,
-    AppState, KEYS, jwt::JWT,
+    entities::user::User as UserEntity, errors::CustomError, jwt::JWT,
+    repositories::user::UserRepository, request::Claims, views::user::User, AppState, KEYS,
 };
+
+#[axum_macros::debug_handler]
+pub async fn get_user(
+    claims: Claims,
+    State(state): State<Arc<AppState>>,
+) -> Result<impl IntoResponse, CustomError> {
+    if let Some(user) = state.user_repository.find_by_user_id(claims.user_id).await {
+        Ok((StatusCode::OK, response::Json::<User>(user.into())))
+    } else {
+        Err(CustomError::UserNotFound)
+    }
+}
 
 // アカウント新規作成
 #[axum_macros::debug_handler]
@@ -28,10 +37,11 @@ pub async fn signup(
         return Err(CustomError::MissingCredentials);
     }
 
-    let new_user = User::create(&payload.email, &payload.password, &payload.display_name);
-    state.user_repository.store(&new_user).await; // 新規ユーザーをDBに保存
+    let new_user = UserEntity::create(&payload.email, &payload.password, &payload.display_name);
+    // TODO: 既に登録済みのEmailかチェックする
+    let saved_user = state.user_repository.store(&new_user).await; // 新規ユーザーをDBに保存
 
-    let jwt = create_token(&new_user)?;
+    let jwt = create_token(&saved_user)?;
 
     Ok((
         StatusCode::OK,
@@ -46,7 +56,7 @@ pub async fn login(
     State(state): State<Arc<AppState>>,
     extract::Json(payload): extract::Json<SignInPayload>,
 ) -> Result<impl IntoResponse, CustomError> {
-    if let Some(user) = state.user_repository.find_by(&payload.email).await {
+    if let Some(user) = state.user_repository.find_by_email(&payload.email).await {
         if !user.matches_password(&payload.password) {
             return Err(CustomError::WrongCredentials);
         }
@@ -64,7 +74,7 @@ pub async fn login(
     }
 }
 
-fn create_token(user: &User) -> Result<JWT, CustomError> {
+fn create_token(user: &UserEntity) -> Result<JWT, CustomError> {
     let claims = Claims {
         user_id: user.id.unwrap(),
         // UTCタイムスタンプによる有効期限（必須

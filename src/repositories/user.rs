@@ -41,8 +41,16 @@ impl UserRepository for UserRepositoryForDb {
             .collect()
     }
 
-    /// emailを使ってusersからユーザーを検索する
-    async fn find_by(&self, email: &str) -> Option<User> {
+    /// user_idを使ってusersからユーザーを検索する
+    async fn find_by_user_id(&self, user_id: i32) -> Option<User> {
+        sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = $1")
+            .bind(user_id)
+            .fetch_optional(&self.pool)
+            .await
+            .unwrap()
+    }
+
+    async fn find_by_email(&self, email: &str) -> Option<User> {
         sqlx::query_as::<_, User>("SELECT * FROM users WHERE email = $1")
             .bind(email)
             .fetch_optional(&self.pool)
@@ -51,22 +59,23 @@ impl UserRepository for UserRepositoryForDb {
     }
 
     /// DBにアカウントレコードを新規追加
-    async fn store(&self, entity: &User) {
-        sqlx::query("INSERT INTO users (email, password, display_name) VALUES ($1, $2, $3)")
+    async fn store(&self, entity: &User) -> User {
+        sqlx::query_as::<_, User>("INSERT INTO users (email, hashed_password, display_name) VALUES ($1, $2, $3) RETURNING id, email, hashed_password, display_name")
             .bind(&entity.email)
             .bind(&entity.hashed_password)
             .bind(&entity.display_name)
-            .execute(&self.pool)
+            .fetch_one(&self.pool)
             .await
-            .unwrap();
+            .unwrap()
     }
 }
 
 #[async_trait]
 pub trait UserRepository: Clone + std::marker::Send + std::marker::Sync + 'static {
     async fn find(&self, ids: HashSet<i32>) -> HashMap<i32, User>;
-    async fn find_by(&self, email: &str) -> Option<User>;
-    async fn store(&self, entity: &User);
+    async fn find_by_user_id(&self, user_id: i32) -> Option<User>;
+    async fn find_by_email(&self, email: &str) -> Option<User>;
+    async fn store(&self, entity: &User) -> User;
 }
 
 // // todosテーブルのみ

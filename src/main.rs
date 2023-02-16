@@ -1,6 +1,9 @@
 use std::{net::SocketAddr, sync::Arc};
 
-use axum::{routing::post, Router};
+use axum::{
+    routing::{get, post},
+    Router,
+};
 use jsonwebtoken::{DecodingKey, EncodingKey};
 use once_cell::sync::Lazy;
 
@@ -14,6 +17,7 @@ mod request;
 // mod validator;
 mod jwt;
 mod repositories;
+mod views;
 
 static KEYS: Lazy<Keys> = Lazy::new(|| {
     let secret = std::env::var("JWT_SECRET").expect("JWT_SECRET must be set");
@@ -23,8 +27,6 @@ static KEYS: Lazy<Keys> = Lazy::new(|| {
 pub struct AppState {
     /// WSのroom、keyはroom名。
     // txs: Mutex<WsRooms>,
-    /// Postgresのプール
-    // pool: Pool<Postgres>,
     user_repository: UserRepositoryForDb,
 }
 
@@ -54,8 +56,9 @@ async fn main() {
     });
 
     let app = Router::new()
-        .route("/users/signup", post(users::signup))
-        .route("/users/login", post(users::login))
+        .route("/api/auth/user", get(users::get_user))
+        .route("/api/auth/signup", post(users::signup))
+        .route("/api/auth/login", post(users::login))
         .with_state(shared_state); // 受信するすべてのリクエストのExtensionにオブジェクトを挿入するミドルウェアを追加
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
