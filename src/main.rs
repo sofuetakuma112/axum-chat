@@ -3,18 +3,17 @@ use std::{net::SocketAddr, sync::Arc};
 use axum::{routing::post, Router};
 use jsonwebtoken::{DecodingKey, EncodingKey};
 use once_cell::sync::Lazy;
-use sqlx::{Pool, Postgres};
 
-use crate::{constants::database_url, controllers::accounts};
+use crate::{constants::database_url, handlers::users, repositories::user::UserRepositoryForDb};
 
 mod constants;
-mod controllers;
 mod entities;
 mod errors;
+mod handlers;
 mod request;
-mod services;
-mod stores;
 // mod validator;
+mod jwt;
+mod repositories;
 
 static KEYS: Lazy<Keys> = Lazy::new(|| {
     let secret = std::env::var("JWT_SECRET").expect("JWT_SECRET must be set");
@@ -25,7 +24,8 @@ pub struct AppState {
     /// WSのroom、keyはroom名。
     // txs: Mutex<WsRooms>,
     /// Postgresのプール
-    pool: Pool<Postgres>,
+    // pool: Pool<Postgres>,
+    user_repository: UserRepositoryForDb,
 }
 
 #[tokio::main]
@@ -41,16 +41,21 @@ async fn main() {
         .connect(&database_url)
         .await
         .unwrap();
+
+    sqlx::migrate!()
+        .run(&pool)
+        .await
+        .expect("Could not apply migrations on the database");
+
     let shared_state = Arc::new(AppState {
         // txs: Mutex::new(WsRooms::default()),
-        pool,
+        // pool,
+        user_repository: UserRepositoryForDb::new(pool.clone()),
     });
 
-    // let database_layer = database::layer().await;
     let app = Router::new()
-        // .route("/", get(sample))
-        .route("/accounts/signup", post(accounts::signup))
-        .route("/accounts/signin", post(accounts::signin))
+        .route("/users/signup", post(users::signup))
+        .route("/users/login", post(users::login))
         .with_state(shared_state); // 受信するすべてのリクエストのExtensionにオブジェクトを挿入するミドルウェアを追加
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));

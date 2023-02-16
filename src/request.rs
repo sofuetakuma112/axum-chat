@@ -1,6 +1,6 @@
 use axum::{
     async_trait,
-    extract::{FromRequestParts,TypedHeader},
+    extract::{FromRequestParts, TypedHeader},
     headers::{authorization::Bearer, Authorization},
     http::request::Parts,
     RequestPartsExt,
@@ -8,7 +8,7 @@ use axum::{
 use jsonwebtoken::{decode, Validation};
 use serde::{Deserialize, Serialize};
 
-use crate::{errors::AuthError, KEYS};
+use crate::{errors::CustomError, KEYS};
 
 /// ハンドラ関数の引数に指定するとミドルウェアとして振る舞う？
 #[derive(Debug, Serialize, Deserialize)]
@@ -24,17 +24,17 @@ impl<S> FromRequestParts<S> for Claims
 where
     S: Send + Sync,
 {
-    type Rejection = AuthError;
+    type Rejection = CustomError;
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         // Extract the token from the authorization header
         let TypedHeader(Authorization(bearer)) = parts
             .extract::<TypedHeader<Authorization<Bearer>>>()
             .await
-            .map_err(|_| AuthError::InvalidToken)?;
+            .map_err(|_| CustomError::InvalidToken)?;
         // Decode the user data
         let token_data = decode::<Claims>(bearer.token(), &KEYS.decoding, &Validation::default())
-            .map_err(|_| AuthError::InvalidToken)?;
+            .map_err(|_| CustomError::InvalidToken)?;
 
         Ok(token_data.claims)
     }

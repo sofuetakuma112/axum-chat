@@ -1,17 +1,17 @@
 use sha2::{Digest, Sha256};
 
 #[derive(sqlx::FromRow)]
-pub struct Account {
+pub struct User {
     pub id: Option<i32>,
     pub email: String,
     pub hashed_password: String,
     pub display_name: String,
 }
 
-impl Account {
-    // DBから取得したRowをAccountエンティティに変換する用
-    pub fn new(id: i32, email: String, hashed_password: String, display_name: String) -> Account {
-        Account {
+impl User {
+    // DBから取得したRowをUserエンティティに変換する用
+    pub fn new(id: i32, email: String, hashed_password: String, display_name: String) -> User {
+        User {
             id: Some(id),
             email,
             hashed_password,
@@ -19,9 +19,9 @@ impl Account {
         }
     }
 
-    // DBに挿入するためにAccountエンティティを作成する用
-    pub fn create(email: &str, password: &str, display_name: &str) -> Account {
-        Account {
+    // DBに挿入するためにUserエンティティを作成する用
+    pub fn create(email: &str, password: &str, display_name: &str) -> User {
+        User {
             id: None,
             email: email.to_string(),
             hashed_password: to_sha256(password),

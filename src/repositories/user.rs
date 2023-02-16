@@ -1,0 +1,113 @@
+use std::collections::{HashMap, HashSet};
+
+use axum::async_trait;
+use sqlx::{PgPool, Pool, Postgres};
+
+use crate::entities::user::User;
+
+#[derive(Debug, Clone)]
+pub struct UserRepositoryForDb {
+    pool: PgPool,
+}
+
+impl UserRepositoryForDb {
+    pub fn new(pool: PgPool) -> Self {
+        UserRepositoryForDb { pool }
+    }
+}
+
+#[async_trait]
+impl UserRepository for UserRepositoryForDb {
+    async fn find(&self, ids: HashSet<i32>) -> HashMap<i32, User> {
+        if ids.is_empty() {
+            return HashMap::new();
+        }
+
+        let ids_str = ids
+            .into_iter()
+            .map(|x| x.to_string())
+            .collect::<Vec<String>>()
+            .join(",");
+
+        let users =
+            sqlx::query_as::<_, User>(&format!("SELECT * FROM users WHERE id in ({})", ids_str))
+                .fetch_all(&self.pool)
+                .await
+                .unwrap();
+
+        users
+            .into_iter()
+            .map(|user| (user.id().unwrap(), user))
+            .collect()
+    }
+
+    /// emailを使ってusersからユーザーを検索する
+    async fn find_by(&self, email: &str) -> Option<User> {
+        sqlx::query_as::<_, User>("SELECT * FROM users WHERE email = $1")
+            .bind(email)
+            .fetch_optional(&self.pool)
+            .await
+            .unwrap()
+    }
+
+    /// DBにアカウントレコードを新規追加
+    async fn store(&self, entity: &User) {
+        sqlx::query("INSERT INTO users (email, password, display_name) VALUES ($1, $2, $3)")
+            .bind(&entity.email)
+            .bind(&entity.hashed_password)
+            .bind(&entity.display_name)
+            .execute(&self.pool)
+            .await
+            .unwrap();
+    }
+}
+
+#[async_trait]
+pub trait UserRepository: Clone + std::marker::Send + std::marker::Sync + 'static {
+    async fn find(&self, ids: HashSet<i32>) -> HashMap<i32, User>;
+    async fn find_by(&self, email: &str) -> Option<User>;
+    async fn store(&self, entity: &User);
+}
+
+// // todosテーブルのみ
+// #[derive(Debug, Clone, PartialEq, Eq, FromRow)]
+// struct UserFromRow {
+//     id: i32,
+//     text: String,
+//     completed: bool,
+// }
+
+// // OUTER JOIN
+// #[derive(Debug, Clone, PartialEq, Eq, FromRow)]
+// struct UserWithLabelFromRow {
+//     id: i32,
+//     text: String,
+//     completed: bool,
+//     label_id: Option<i32>,
+//     label_name: Option<String>,
+// }
+
+// #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+// pub struct UserEntity {
+//     pub id: i32,
+//     pub text: String,
+//     pub completed: bool,
+//     pub labels: Vec<Label>,
+// }
+
+// #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Validate)]
+// pub struct CreateUser {
+//     #[validate(length(min = 1, message = "Can not be empty"))]
+//     #[validate(length(max = 100, message = "Over text length"))]
+//     text: String,
+//     labels: Vec<i32>,
+// }
+
+// #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Validate)]
+// pub struct UpdateUser {
+//     #[validate(length(min = 1, message = "Can not be empty"))]
+//     #[validate(length(max = 100, message = "Over text length"))]
+//     text: Option<String>,
+//     completed: Option<bool>,
+//     labels: Option<Vec<i32>>,
+// }

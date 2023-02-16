@@ -6,21 +6,25 @@ use axum::{
 use serde_json::json;
 
 #[derive(Debug)]
-pub enum AuthError {
+pub enum CustomError {
     WrongCredentials,
     MissingCredentials,
     TokenCreation,
     InvalidToken,
+    CannotEncodeToken(jsonwebtoken::errors::Error),
 }
 
-impl IntoResponse for AuthError {
+impl IntoResponse for CustomError {
     fn into_response(self) -> Response {
         // IntoResponseを実装している(StatusCode, &str)に詰め替える
         let (status, error_message) = match self {
-            AuthError::WrongCredentials => (StatusCode::UNAUTHORIZED, "Wrong credentials"),
-            AuthError::MissingCredentials => (StatusCode::BAD_REQUEST, "Missing credentials"),
-            AuthError::TokenCreation => (StatusCode::INTERNAL_SERVER_ERROR, "Token creation error"),
-            AuthError::InvalidToken => (StatusCode::BAD_REQUEST, "Invalid token"),
+            CustomError::WrongCredentials => (StatusCode::UNAUTHORIZED, "Wrong credentials"),
+            CustomError::MissingCredentials => (StatusCode::BAD_REQUEST, "Missing credentials"),
+            CustomError::TokenCreation => (StatusCode::INTERNAL_SERVER_ERROR, "Token creation error"),
+            CustomError::InvalidToken => (StatusCode::BAD_REQUEST, "Invalid token"),
+            CustomError::CannotEncodeToken(_) => {
+                (StatusCode::INTERNAL_SERVER_ERROR, "Token encode error")
+            }
         };
         let body = Json(json!({
             "error": error_message,
