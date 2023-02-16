@@ -7,6 +7,7 @@ use axum::{
 };
 use jsonwebtoken::{encode, Header};
 use serde::Deserialize;
+use serde_json::json;
 use validator::Validate;
 
 use crate::{
@@ -20,7 +21,8 @@ pub async fn get_user(
     State(state): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, CustomError> {
     if let Some(user) = state.user_repository.find_by_user_id(claims.user_id).await {
-        Ok((StatusCode::OK, response::Json::<User>(user.into())))
+        let user_view: User = user.into();
+        Ok((StatusCode::OK, response::Json(json!({ "user": user_view }))))
     } else {
         Err(CustomError::UserNotFound)
     }
@@ -46,7 +48,7 @@ pub async fn signup(
     Ok((
         StatusCode::CREATED,
         [(header::SET_COOKIE, jwt.cookie())],
-        "ユーザが作成されました。",
+        response::Json(json!({ "message": "ユーザが作成されました。" })),
     ))
 }
 
@@ -66,7 +68,7 @@ pub async fn login(
         Ok((
             StatusCode::OK,
             [(header::SET_COOKIE, jwt.cookie())],
-            "ログインに成功しました。",
+            response::Json(json!({ "message": "ログインに成功しました。" })),
         ))
     } else {
         Err(CustomError::UserNotFound)
@@ -78,7 +80,7 @@ pub async fn logout(_: Claims) -> impl IntoResponse {
     (
         StatusCode::OK,
         [(header::SET_COOKIE, JWT::clear_cookie())],
-        "ログアウト処理が完了しました。",
+        response::Json(json!({ "message": "ログアウト処理が完了しました。" })),
     )
 }
 
