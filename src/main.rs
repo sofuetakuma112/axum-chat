@@ -1,16 +1,19 @@
 use std::{net::SocketAddr, sync::Arc};
 
 use axum::{
-    routing::{get, post, delete},
+    routing::{delete, get, post, put},
     Router,
 };
 use jsonwebtoken::{DecodingKey, EncodingKey};
 use once_cell::sync::Lazy;
-use repositories::follow::FollowRepositoryForDb;
+use repositories::{
+    follow::FollowRepositoryForDb, room::RoomRepositoryForDb,
+    room_member::RoomMemberRepositoryForDb,
+};
 
 use crate::{
     constants::database_url,
-    handlers::{auth, users},
+    handlers::{auth, rooms, users},
     repositories::user::UserRepositoryForDb,
 };
 
@@ -34,6 +37,8 @@ pub struct AppState {
     // txs: Mutex<WsRooms>,
     user_repository: UserRepositoryForDb,
     follow_repository: FollowRepositoryForDb,
+    room_repository: RoomRepositoryForDb,
+    room_member_repository: RoomMemberRepositoryForDb,
 }
 
 #[tokio::main]
@@ -59,6 +64,8 @@ async fn main() {
         // txs: Mutex::new(WsRooms::default()),
         user_repository: UserRepositoryForDb::new(pool.clone()),
         follow_repository: FollowRepositoryForDb::new(pool.clone()),
+        room_repository: RoomRepositoryForDb::new(pool.clone()),
+        room_member_repository: RoomMemberRepositoryForDb::new(pool.clone()),
     });
 
     let app = Router::new()
@@ -70,6 +77,14 @@ async fn main() {
         .route("/api/users/:user_id/followees", get(users::get_followees))
         .route("/api/users/:user_id/relationships", get(users::follow)) // user_idのユーザーをフォローする
         .route("/api/users/:user_id/relationships", delete(users::unfollow)) // user_idのユーザーをアンフォローする
+        .route("/api/rooms", get(rooms::get_rooms)) // ルームの一覧を取得
+        .route("/api/rooms", post(rooms::create_room)) // ルームの新規作成(追加するユーザーのIDをbodyに持つ)
+        .route("/api/rooms/:room_id/members", get(rooms::get_room_members)) // room_idのルームのメンバー一覧を取得する
+        .route("/api/rooms/:room_id/members", post(rooms::add_room_member)) // room_idのルームに新しいメンバーの追加
+        .route(
+            "/api/rooms/:room_id/members/:member_id",
+            delete(rooms::delete_room_member),
+        ) // room_idのルームからmember_idのユーザーを削除する
         .with_state(shared_state); // 受信するすべてのリクエストのExtensionにオブジェクトを挿入するミドルウェアを追加
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
