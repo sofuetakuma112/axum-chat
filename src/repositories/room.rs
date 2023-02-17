@@ -16,6 +16,18 @@ impl RoomRepositoryForDb {
 
 #[async_trait]
 impl RoomRepository for RoomRepositoryForDb {
+    async fn find_by_member_id(&self, member_id: i32) -> Vec<Room> {
+        sqlx::query_as::<_, Room>(
+            "SELECT * FROM rooms WHERE id in (
+SELECT room_id FROM room_members WHERE member_id = $1
+)",
+        )
+        .bind(&member_id)
+        .fetch_all(&self.pool)
+        .await
+        .unwrap()
+    }
+
     async fn store(&self) -> Room {
         sqlx::query_as::<_, Room>("INSERT INTO rooms RETURNING id")
             .fetch_one(&self.pool)
@@ -26,5 +38,6 @@ impl RoomRepository for RoomRepositoryForDb {
 
 #[async_trait]
 pub trait RoomRepository: Clone + std::marker::Send + std::marker::Sync + 'static {
+    async fn find_by_member_id(&self, member_id: i32) -> Vec<Room>;
     async fn store(&self) -> Room;
 }

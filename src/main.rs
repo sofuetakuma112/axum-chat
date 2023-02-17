@@ -77,10 +77,10 @@ async fn main() {
         .route("/api/users/:user_id/followees", get(users::get_followees))
         .route("/api/users/:user_id/relationships", get(users::follow)) // user_idのユーザーをフォローする
         .route("/api/users/:user_id/relationships", delete(users::unfollow)) // user_idのユーザーをアンフォローする
-        .route("/api/rooms", get(rooms::get_rooms)) // ルームの一覧を取得
-        .route("/api/rooms", post(rooms::create_room)) // ルームの新規作成(追加するユーザーのIDをbodyに持つ)
-        .route("/api/rooms/:room_id/members", get(rooms::get_room_members)) // room_idのルームのメンバー一覧を取得する
-        .route("/api/rooms/:room_id/members", post(rooms::add_room_member)) // room_idのルームに新しいメンバーの追加
+        .route("/api/users/:user_id/rooms", get(rooms::get_rooms)) // ルームの一覧を取得
+        .route("/api/users/:user_id/rooms", post(rooms::create_room)) // ルームの新規作成(追加するユーザーのIDをbodyに持つ)
+        .route("/api/users/:user_id/rooms/:room_id/members", get(rooms::get_room_members)) // room_idのルームのメンバー一覧を取得する
+        .route("/api/users/:user_id/rooms/:room_id/members", post(rooms::add_room_member)) // room_idのルームに新しいメンバーの追加
         .route(
             "/api/rooms/:room_id/members/:member_id",
             delete(rooms::delete_room_member),

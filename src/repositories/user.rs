@@ -18,9 +18,9 @@ impl UserRepositoryForDb {
 
 #[async_trait]
 impl UserRepository for UserRepositoryForDb {
-    async fn find(&self, ids: HashSet<i32>) -> HashMap<i32, User> {
+    async fn find(&self, ids: &Vec<i32>) -> Vec<User> {
         if ids.is_empty() {
-            return HashMap::new();
+            return Vec::new();
         }
 
         let ids_str = ids
@@ -29,16 +29,10 @@ impl UserRepository for UserRepositoryForDb {
             .collect::<Vec<String>>()
             .join(",");
 
-        let users =
-            sqlx::query_as::<_, User>(&format!("SELECT * FROM users WHERE id in ({})", ids_str))
-                .fetch_all(&self.pool)
-                .await
-                .unwrap();
-
-        users
-            .into_iter()
-            .map(|user| (user.id().unwrap(), user))
-            .collect()
+        sqlx::query_as::<_, User>(&format!("SELECT * FROM users WHERE id in ({})", ids_str))
+            .fetch_all(&self.pool)
+            .await
+            .unwrap()
     }
 
     /// user_idを使ってusersからユーザーを検索する
@@ -72,7 +66,7 @@ impl UserRepository for UserRepositoryForDb {
 
 #[async_trait]
 pub trait UserRepository: Clone + std::marker::Send + std::marker::Sync + 'static {
-    async fn find(&self, ids: HashSet<i32>) -> HashMap<i32, User>;
+    async fn find(&self, ids: &Vec<i32>) -> Vec<User>;
     async fn find_by_user_id(&self, user_id: i32) -> Option<User>;
     async fn find_by_email(&self, email: &str) -> Option<User>;
     async fn store(&self, entity: &User) -> User;
