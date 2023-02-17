@@ -1,118 +1,85 @@
 use std::sync::Arc;
 
 use axum::{
-    extract::{self, State},
-    http::{header, StatusCode},
+    extract::{Path, State},
+    http::StatusCode,
     response::{self, IntoResponse},
 };
-use jsonwebtoken::{encode, Header};
-use serde::Deserialize;
 use serde_json::json;
-use validator::Validate;
 
 use crate::{
-    entities::user::User as UserEntity, errors::CustomError, jwt::JWT,
-    repositories::user::UserRepository, request::Claims, views::user::User, AppState, KEYS,
+    errors::CustomError, repositories::follow::FollowRepository, request::Claims,
+    views::user::User, AppState,
 };
 
+/// user_idのユーザーをフォローしているユーザー一覧を返す
 #[axum_macros::debug_handler]
-pub async fn get_user(
+pub async fn get_followers(
     claims: Claims,
+    Path(user_id): Path<i32>,
     State(state): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, CustomError> {
-    if let Some(user) = state.user_repository.find_by_user_id(claims.user_id).await {
-        let user_view: User = user.into();
-        Ok((StatusCode::OK, response::Json(json!({ "user": user_view }))))
-    } else {
-        Err(CustomError::UserNotFound)
-    }
-}
-
-// アカウント新規作成
-#[axum_macros::debug_handler]
-pub async fn signup(
-    State(state): State<Arc<AppState>>,
-    extract::Json(payload): extract::Json<SignUpPayload>,
-) -> Result<impl IntoResponse, CustomError> {
-    // ユーザーがクレデンシャルを送信したかどうかを確認する
-    if payload.email.is_empty() || payload.password.is_empty() || payload.display_name.is_empty() {
-        return Err(CustomError::MissingCredentials);
+    if user_id != claims.user_id {
+        return Err(CustomError::AccessingUnauthorisedResources);
     }
 
-    let new_user = UserEntity::create(&payload.email, &payload.password, &payload.display_name);
-    // TODO: 既に登録済みのEmailかチェックする
-    let saved_user = state.user_repository.store(&new_user).await; // 新規ユーザーをDBに保存
-
-    let jwt = create_token(&saved_user)?;
-
+    let followers = state.follow_repository.find_follower(user_id).await;
     Ok((
-        StatusCode::CREATED,
-        [(header::SET_COOKIE, jwt.cookie())],
-        response::Json(json!({ "message": "ユーザが作成されました。" })),
+        StatusCode::OK,
+        response::Json(
+            json!({ "followers": followers.into_iter().map(|follow| User::from(follow)).collect::<Vec<User>>() }),
+        ),
     ))
 }
 
-// ログイン
+/// user_idのユーザーがフォローしているユーザー一覧を返す
 #[axum_macros::debug_handler]
-pub async fn login(
+pub async fn get_followees(
+    claims: Claims,
+    Path(user_id): Path<i32>,
     State(state): State<Arc<AppState>>,
-    extract::Json(payload): extract::Json<SignInPayload>,
 ) -> Result<impl IntoResponse, CustomError> {
-    if let Some(user) = state.user_repository.find_by_email(&payload.email).await {
-        if !user.matches_password(&payload.password) {
-            return Err(CustomError::WrongCredentials);
-        }
-
-        let jwt = create_token(&user)?;
-
-        Ok((
-            StatusCode::OK,
-            [(header::SET_COOKIE, jwt.cookie())],
-            response::Json(json!({ "message": "ログインに成功しました。" })),
-        ))
-    } else {
-        Err(CustomError::UserNotFound)
+    if user_id != claims.user_id {
+        return Err(CustomError::AccessingUnauthorisedResources);
     }
+
+    let followees = state.follow_repository.find_followee(user_id).await;
+    Ok((
+        StatusCode::OK,
+        response::Json(
+            json!({ "followees": followees.into_iter().map(|follow| User::from(follow)).collect::<Vec<User>>() }),
+        ),
+    ))
 }
 
 #[axum_macros::debug_handler]
-pub async fn logout(_: Claims) -> impl IntoResponse {
-    (
-        StatusCode::OK,
-        [(header::SET_COOKIE, JWT::clear_cookie())],
-        response::Json(json!({ "message": "ログアウト処理が完了しました。" })),
-    )
+pub async fn follow(
+    claims: Claims,
+    Path(user_id): Path<i32>, // フォローするユーザーID
+    State(state): State<Arc<AppState>>,
+) -> Result<impl IntoResponse, CustomError> {
+    state
+        .follow_repository
+        .follow(claims.user_id, user_id)
+        .await;
+    Ok((
+        StatusCode::CREATED,
+        response::Json(json!({ "message": "フォローしました。" })),
+    ))
 }
 
-fn create_token(user: &UserEntity) -> Result<JWT, CustomError> {
-    let claims = Claims {
-        user_id: user.id.unwrap(),
-        // UTCタイムスタンプによる有効期限（必須
-        exp: 2000000000, // May 2033
-    };
-
-    // 認証トークンを作成する。
-    // Header: 基本的なJWTヘッダーで、
-    // algはデフォルトでHS256、typは自動的にJWTに設定されます。
-    // 他のフィールドはすべてオプションです。
-    // encode: 与えられたヘッダーとクレームをエンコードし、
-    // ヘッダーのアルゴリズムと鍵を用いてペイロードに署名する。
-    // 与えられたアルゴリズムがRSAまたはECの場合、鍵はPEM形式である必要がある。
-    match encode(&Header::default(), &claims, &KEYS.encoding) {
-        Ok(encoded_token) => Ok(JWT::new(&encoded_token)),
-        Err(err) => Err(CustomError::CannotEncodeToken(err)),
-    }
-}
-
-#[derive(Debug, Deserialize, Validate)]
-pub struct SignInPayload {
-    email: String,
-    password: String,
-}
-
-#[derive(Debug, Deserialize, Validate)]
-pub struct SignUpPayload {
-    email: String,
-    password: String,
-    display_name: String,
+#[axum_macros::debug_handler]
+pub async fn unfollow(
+    claims: Claims,
+    Path(user_id): Path<i32>, // フォローするユーザーID
+    State(state): State<Arc<AppState>>,
+) -> Result<impl IntoResponse, CustomError> {
+    state
+        .follow_repository
+        .unfollow(claims.user_id, user_id)
+        .await;
+    Ok((
+        StatusCode::NO_CONTENT,
+        response::Json(json!({ "message": "フォローを解除しました。" })),
+    ))
 }

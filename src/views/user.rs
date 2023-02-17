@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-use crate::entities::user::User as UserEntity;
+use crate::entities::users::User as UserEntity;
 
 #[derive(Serialize)]
 pub struct User {

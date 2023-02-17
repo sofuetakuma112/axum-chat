@@ -11,10 +11,10 @@ impl JWT {
 
     pub fn cookie(&self) -> String {
         // TODO: max-ageを反映する
-        format!("token={}; HttpOnly", self.token)
+        format!("token={}; Path=/; HttpOnly", self.token)
     }
 
     pub fn clear_cookie() -> String {
-        "token=; HttpOnly; Max-Age=0".to_string()
+        "token=; HttpOnly; Path=/; Max-Age=0".to_string()
     }
 }

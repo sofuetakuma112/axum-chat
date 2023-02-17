@@ -1,13 +1,18 @@
 use std::{net::SocketAddr, sync::Arc};
 
 use axum::{
-    routing::{get, post},
+    routing::{get, post, delete},
     Router,
 };
 use jsonwebtoken::{DecodingKey, EncodingKey};
 use once_cell::sync::Lazy;
+use repositories::follow::FollowRepositoryForDb;
 
-use crate::{constants::database_url, handlers::users, repositories::user::UserRepositoryForDb};
+use crate::{
+    constants::database_url,
+    handlers::{auth, users},
+    repositories::user::UserRepositoryForDb,
+};
 
 mod constants;
 mod entities;
@@ -28,6 +33,7 @@ pub struct AppState {
     /// WSのroom、keyはroom名。
     // txs: Mutex<WsRooms>,
     user_repository: UserRepositoryForDb,
+    follow_repository: FollowRepositoryForDb,
 }
 
 #[tokio::main]
@@ -51,15 +57,19 @@ async fn main() {
 
     let shared_state = Arc::new(AppState {
         // txs: Mutex::new(WsRooms::default()),
-        // pool,
         user_repository: UserRepositoryForDb::new(pool.clone()),
+        follow_repository: FollowRepositoryForDb::new(pool.clone()),
     });
 
     let app = Router::new()
-        .route("/api/auth/user", get(users::get_user))
-        .route("/api/auth/signup", post(users::signup))
-        .route("/api/auth/login", post(users::login))
-        .route("/api/auth/logout", get(users::logout))
+        .route("/api/auth/user", get(auth::get_user))
+        .route("/api/auth/signup", post(auth::signup))
+        .route("/api/auth/login", post(auth::login))
+        .route("/api/auth/logout", get(auth::logout))
+        .route("/api/users/:user_id/followers", get(users::get_followers))
+        .route("/api/users/:user_id/followees", get(users::get_followees))
+        .route("/api/users/:user_id/relationships", get(users::follow)) // user_idのユーザーをフォローする
+        .route("/api/users/:user_id/relationships", delete(users::unfollow)) // user_idのユーザーをアンフォローする
         .with_state(shared_state); // 受信するすべてのリクエストのExtensionにオブジェクトを挿入するミドルウェアを追加
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));

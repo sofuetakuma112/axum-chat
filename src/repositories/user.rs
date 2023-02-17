@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use axum::async_trait;
 use sqlx::PgPool;
 
-use crate::entities::user::User;
+use crate::entities::users::User;
 
 #[derive(Debug, Clone)]
 pub struct UserRepositoryForDb {
