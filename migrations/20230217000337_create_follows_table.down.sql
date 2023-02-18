@@ -1,2 +1,2 @@
 -- Add down migration script here
-DROP TABLE follows
+DROP TABLE IF EXISTS follows

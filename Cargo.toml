@@ -12,7 +12,11 @@ tokio = { version = "1.0", features = ["macros"] }
 dotenv = "0.15.0"
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3" }
-sqlx = { version = "0.6", features = ["runtime-tokio-rustls", "postgres"] }
+sqlx = { version = "0.6", features = [
+    "runtime-tokio-rustls",
+    "postgres",
+    "chrono",
+] }
 serde = { version = "1.0", features = ["derive"] }
 derivative = "2.2.0"
 chrono = "0.4.23"
