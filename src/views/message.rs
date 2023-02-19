@@ -18,7 +18,7 @@ impl From<(MessageEntity, &User)> for Message {
         let (message_entity, user_entity) = e;
         Message {
             id: message_entity.id.unwrap_or(-1),
-            name: user_entity.display_name.clone(),
+            name: user_entity.name.clone(),
             message: message_entity.message,
             message_type: message_entity.message_type as i32,
             created_at: message_entity

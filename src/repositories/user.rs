@@ -52,10 +52,10 @@ impl UserRepository for UserRepositoryForDb {
 
     /// DBにアカウントレコードを新規追加
     async fn store(&self, entity: &User) -> User {
-        sqlx::query_as::<_, User>("INSERT INTO users (email, hashed_password, display_name) VALUES ($1, $2, $3) RETURNING id, email, hashed_password, display_name")
+        sqlx::query_as::<_, User>("INSERT INTO users (email, hashed_password, name) VALUES ($1, $2, $3) RETURNING id, email, hashed_password, name")
             .bind(&entity.email)
             .bind(&entity.hashed_password)
-            .bind(&entity.display_name)
+            .bind(&entity.name)
             .fetch_one(&self.pool)
             .await
             .unwrap()

@@ -35,11 +35,11 @@ pub async fn signup(
     extract::Json(payload): extract::Json<SignUpPayload>,
 ) -> Result<impl IntoResponse, CustomError> {
     // ユーザーがクレデンシャルを送信したかどうかを確認する
-    if payload.email.is_empty() || payload.password.is_empty() || payload.display_name.is_empty() {
+    if payload.email.is_empty() || payload.password.is_empty() || payload.name.is_empty() {
         return Err(CustomError::MissingCredentials);
     }
 
-    let new_user = UserEntity::create(&payload.email, &payload.password, &payload.display_name);
+    let new_user = UserEntity::create(&payload.email, &payload.password, &payload.name);
     // TODO: 既に登録済みのEmailかチェックする
     let saved_user = state.user_repository.store(&new_user).await; // 新規ユーザーをDBに保存
 
@@ -114,5 +114,5 @@ pub struct SignInPayload {
 pub struct SignUpPayload {
     email: String,
     password: String,
-    display_name: String,
+    name: String,
 }

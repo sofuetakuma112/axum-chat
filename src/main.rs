@@ -81,7 +81,7 @@ async fn main() {
         .route("/api/auth/user", get(auth::get_user))
         .route("/api/auth/signup", post(auth::signup))
         .route("/api/auth/login", post(auth::login))
-        .route("/api/auth/logout", get(auth::logout))
+        .route("/api/auth/logout", delete(auth::logout))
         .route("/api/users/:user_id/followers", get(users::get_followers))
         .route("/api/users/:user_id/followees", get(users::get_followees))
         .route("/api/users/:user_id/relationships", get(users::follow)) // user_idのユーザーをフォローする

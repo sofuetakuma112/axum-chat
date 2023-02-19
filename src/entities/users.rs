@@ -6,27 +6,27 @@ pub struct User {
     pub id: Option<i32>,
     pub email: String,
     pub hashed_password: String,
-    pub display_name: String,
+    pub name: String,
 }
 
 impl User {
     // DBから取得したRowをUserエンティティに変換する用
-    // pub fn new(id: i32, email: String, hashed_password: String, display_name: String) -> User {
+    // pub fn new(id: i32, email: String, hashed_password: String, name: String) -> User {
     //     User {
     //         id: Some(id),
     //         email,
     //         hashed_password,
-    //         display_name,
+    //         name,
     //     }
     // }
 
     // DBに挿入するためにUserエンティティを作成する用
-    pub fn create(email: &str, password: &str, display_name: &str) -> User {
+    pub fn create(email: &str, password: &str, name: &str) -> User {
         User {
             id: None,
             email: email.to_string(),
             hashed_password: to_sha256(password),
-            display_name: display_name.to_string(),
+            name: name.to_string(),
         }
     }
 

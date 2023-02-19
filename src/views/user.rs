@@ -5,7 +5,7 @@ use crate::entities::users::User as UserEntity;
 #[derive(Serialize)]
 pub struct User {
     pub id: i32,
-    pub display_name: String,
+    pub name: String,
     pub email: String,
 }
 
@@ -14,7 +14,7 @@ impl From<UserEntity> for User {
     fn from(user_entity: UserEntity) -> Self {
         User {
             id: user_entity.id.unwrap(),
-            display_name: user_entity.display_name,
+            name: user_entity.name,
             email: user_entity.email,
         }
     }
