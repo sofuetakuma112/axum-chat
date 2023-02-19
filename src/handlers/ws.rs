@@ -399,7 +399,7 @@ pub enum WsMessage {
     /// { "send": { "content": "メッセージの内容" } } を送信する
     Send(MessagePayload),
     /// ユーザーから送信された画像ファイル
-    SendImage(ImagePayload), // Jsonでバイナリを送信する際はbase64エンコードされるのでString型で扱う
+    // SendImage(ImagePayload), // Jsonでバイナリを送信する際はbase64エンコードされるのでString型で扱う
     /// クライアント側で表示されるコンテンツ。
     Receive(MessageView),
     /// クライアントがルームの全メッセージを取得するために送信するアクション。
@@ -436,16 +436,16 @@ pub struct MessagePayload {
     pub content: String,
 }
 
-#[derive(
-    Debug, Clone, Serialize, Deserialize, derivative::Derivative, PartialEq, Eq, Hash, sqlx::FromRow,
-)]
-#[derivative(Default)]
-#[serde(rename_all = "camelCase")]
-pub struct ImagePayload {
-    /// メッセージの内容です。
-    pub base64: String,
-    pub extension: String,
-}
+// #[derive(
+//     Debug, Clone, Serialize, Deserialize, derivative::Derivative, PartialEq, Eq, Hash, sqlx::FromRow,
+// )]
+// #[derivative(Default)]
+// #[serde(rename_all = "camelCase")]
+// pub struct ImagePayload {
+//     /// メッセージの内容です。
+//     pub base64: String,
+//     pub extension: String,
+// }
 
 #[derive(Debug, Clone, Serialize, Deserialize, derivative::Derivative, PartialEq, Eq, Hash)]
 pub enum WsError {
