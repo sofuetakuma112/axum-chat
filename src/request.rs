@@ -1,11 +1,6 @@
 use crate::{errors::CustomError, KEYS};
-use axum::{
-    async_trait,
-    extract::{FromRequestParts, TypedHeader},
-    headers::Cookie,
-    http::request::Parts,
-    RequestPartsExt,
-};
+use axum::{async_trait, extract::FromRequestParts, http::request::Parts};
+use axum_extra::extract::CookieJar;
 use jsonwebtoken::{decode, Validation};
 use serde::{Deserialize, Serialize};
 
@@ -26,16 +21,14 @@ where
     type Rejection = CustomError;
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        // クッキーからトークンを抽出する
-        let TypedHeader(cookies) = parts
-            .extract::<TypedHeader<Cookie>>()
-            .await
-            .map_err(|_| CustomError::InvalidToken)?;
-        let jwt = cookies.get("token").ok_or(CustomError::NoToken)?;
-        // ユーザーデータのデコード
-        let token_data = decode::<Claims>(jwt, &KEYS.decoding, &Validation::default())
-            .map_err(|_| CustomError::InvalidToken)?;
-
-        Ok(token_data.claims)
+        let headers = &parts.headers;
+        let cookie_jar: CookieJar = CookieJar::from_headers(headers);
+        let Some(cookie) = cookie_jar.get("token")  else {
+            return Err(CustomError::NoToken);
+        };
+        match decode::<Claims>(cookie.value(), &KEYS.decoding, &Validation::default()) {
+            Ok(token_data) => Ok(token_data.claims),
+            Err(_) => Err(CustomError::InvalidToken),
+        }
     }
 }

@@ -1,9 +1,10 @@
-use std::{net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, sync::{Arc, Mutex}};
 
 use axum::{
     routing::{delete, get, post},
     Router,
 };
+use handlers::ws::WsRooms;
 use jsonwebtoken::{DecodingKey, EncodingKey};
 use once_cell::sync::Lazy;
 use repositories::{
@@ -13,7 +14,7 @@ use repositories::{
 
 use crate::{
     constants::database_url,
-    handlers::{auth, messages, rooms, users},
+    handlers::{auth, messages, rooms, users, ws},
     repositories::user::UserRepositoryForDb,
 };
 
@@ -34,7 +35,7 @@ static KEYS: Lazy<Keys> = Lazy::new(|| {
 
 pub struct AppState {
     /// WSのroom、keyはroom名。
-    // txs: Mutex<WsRooms>,
+    txs: Mutex<WsRooms>,
     user_repository: UserRepositoryForDb,
     follow_repository: FollowRepositoryForDb,
     room_repository: RoomRepositoryForDb,
@@ -62,7 +63,7 @@ async fn main() {
         .expect("Could not apply migrations on the database");
 
     let shared_state = Arc::new(AppState {
-        // txs: Mutex::new(WsRooms::default()),
+        txs: Mutex::new(WsRooms::default()),
         user_repository: UserRepositoryForDb::new(pool.clone()),
         follow_repository: FollowRepositoryForDb::new(pool.clone()),
         room_repository: RoomRepositoryForDb::new(pool.clone()),
@@ -101,12 +102,18 @@ async fn main() {
             "/api/users/:user_id/rooms/:room_id/messages",
             post(messages::create_message),
         )
+        .route("/ws", get(ws::ws_test_handler))
+        .route("/ws/users/:user_id/rooms", get(ws::rooms_handler))
+        .route(
+            "/ws/users/:user_id/rooms/:room_id",
+            get(ws::messages_handler),
+        )
         .with_state(shared_state); // 受信するすべてのリクエストのExtensionにオブジェクトを挿入するミドルウェアを追加
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     tracing::debug!("listening on {}", addr);
     axum::Server::bind(&addr)
-        .serve(app.into_make_service())
+        .serve(app.into_make_service_with_connect_info::<SocketAddr>())
         .await
         .unwrap();
 }
