@@ -1,9 +1,9 @@
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 
 use crate::entities::{messages::Message as MessageEntity, users::User};
 
 // Messageビュー
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Debug, Clone, Hash, Eq, PartialEq)]
 pub struct Message {
     pub id: i32,
     pub name: String,

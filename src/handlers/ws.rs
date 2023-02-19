@@ -9,8 +9,11 @@ use std::{
 use crate::{
     entities::messages::Message as MessageEntity,
     errors::CustomError,
-    repositories::{message::MessageRepository, room_member::RoomMemberRepository},
+    repositories::{
+        message::MessageRepository, room_member::RoomMemberRepository, user::UserRepository,
+    },
     request::Claims,
+    views::message::Message as MessageView,
     AppState,
 };
 use axum::{
@@ -25,8 +28,6 @@ use futures::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio::sync::broadcast;
-
-use uuid::Uuid;
 
 pub async fn ws_test_handler(
     ws: WebSocketUpgrade,
@@ -188,11 +189,11 @@ fn process_message(msg: Message, who: SocketAddr) -> ControlFlow<(), ()> {
 
 /// 部屋名をキー、ウェブソケットデータを値として含むハッシュマップ。
 #[derive(Default, Debug)]
-pub struct WsRooms(HashMap<i32, broadcast::Sender<String>>);
+pub struct WsRooms(HashMap<i32, broadcast::Sender<WsMessage>>);
 
 // WsRooms構造体のインスタンスからHashMapのメソッドを呼び出すために必要
 impl Deref for WsRooms {
-    type Target = HashMap<i32, broadcast::Sender<String>>;
+    type Target = HashMap<i32, broadcast::Sender<WsMessage>>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -256,21 +257,6 @@ async fn handle_socket_for_messages(
     // receiver: 接続してきたユーザーから送信されたメッセージを受信するのに使う
     let (mut sender, mut receiver) = socket.split();
 
-    // 新しく接続してきたクライアントに対して、過去のメッセージをDBから取得して送信する
-    let messages = state.message_repository.find_by_room_id(room_id).await;
-    sender
-        .send(Message::Text(
-            serde_json::to_string(&WsMessage::MessagesRetrieved(
-                messages
-                    .into_iter()
-                    .map(|message| WsMessageContent::new(message.message))
-                    .collect(),
-            ))
-            .unwrap(),
-        ))
-        .await
-        .unwrap();
-
     // room_idのルームに接続しているユーザーに対してメッセージをブロードキャストするためのSenderを取得する
     let tx = {
         // 特定のルームに接続している購読者全体にメッセージを送信するためのSenderを取得
@@ -291,14 +277,30 @@ async fn handle_socket_for_messages(
 
     let mut send_to_listener_task = tokio::spawn(async move {
         // ブロードキャストされたメッセージをここで受け取る
-        while let Ok(msg) = rx.recv().await {
-            // ウェブソケットエラーが発生した場合は、ループを解除する。
-            if sender
-                .send(Message::Text(json!({ "message": msg }).to_string()))
-                .await
-                .is_err()
-            {
-                break;
+        while let Ok(ws_message) = rx.recv().await {
+            // TODO: アームの中の処理を共通化する
+            match ws_message {
+                WsMessage::Receive(message) => {
+                    if let Ok(msg) = serde_json::to_string(&WsMessage::Receive(message)) {
+                        if sender.send(Message::Text(msg)).await.is_err() {
+                            break;
+                        }
+                    }
+                }
+                WsMessage::OldMessagesRetrieved { messages, user_id } => {
+                    if claims.user_id == user_id {
+                        if let Ok(msg) = serde_json::to_string(&WsMessage::OldMessagesRetrieved {
+                            messages,
+                            user_id,
+                        }) {
+                            // ウェブソケットエラーが発生した場合は、ループを解除する。
+                            if sender.send(Message::Text(msg)).await.is_err() {
+                                break;
+                            }
+                        }
+                    }
+                }
+                _ => {}
             }
         }
     });
@@ -314,22 +316,44 @@ async fn handle_socket_for_messages(
                         let message =
                             MessageEntity::create(room_id, user_id, ws_message.content.clone());
                         // TODO: リポジトリ層でエラーを返すようにしたらエラーハンドリングする
-                        state.message_repository.store(&message).await;
-                        let _ = tx
-                            .send(serde_json::to_string(&WsMessage::Receive(ws_message)).unwrap());
+                        let message = state.message_repository.store(&message).await;
+
+                        let user = state
+                            .user_repository
+                            .find_by_user_id(user_id)
+                            .await
+                            .unwrap();
+
+                        let message: MessageView = (message, &user).into();
+                        let _ = tx.send(WsMessage::Receive(message));
                     }
-                    // WsMessage::RetrieveMessages(session_id) => {
-                    //     // let messages: Vec<WsMessageContent> =
-                    //     //     WsMessageContent::query_all_for_room(&room_id, &state.pg_pool).await;
-                    //     let messages = state.message_repository.find_by_room_id(room_id).await;
-                    //     let _ = tx.send(
-                    //         serde_json::to_string(&WsMessage::MessagesRetrieved {
-                    //             messages,
-                    //             session_id,
-                    //         })
-                    //         .unwrap(),
-                    //     );
-                    // }
+                    WsMessage::RequestOldMessages => {
+                        // 新しく接続してきたクライアントに対して、過去のメッセージをDBから取得して送信する
+                        // TODO: handlers/messages.rs のget_messagesと処理が重複しているのでサービスに切り出す
+                        let messages = state.message_repository.find_by_room_id(room_id).await;
+                        let user_ids = messages
+                            .iter()
+                            .map(|message| message.user_id)
+                            .collect::<Vec<i32>>();
+                        let users = state.user_repository.find(&user_ids).await;
+                        let messages = messages
+                            .into_iter()
+                            .map(|x| {
+                                let posted_user = users
+                                    .iter()
+                                    .find(|&user| user.id.unwrap() == x.user_id)
+                                    .unwrap();
+                                // .into() を呼び出し、Messageビューに変換している
+                                // Fromトレイトの実装を利用している
+                                (x, posted_user).into()
+                            })
+                            .collect::<Vec<MessageView>>();
+
+                        let _ = tx.send(WsMessage::OldMessagesRetrieved {
+                            messages,
+                            user_id, // 送信先のuser_id
+                        });
+                    }
                     // WsMessage::Seen(messages) => {
                     //     if let Err(e) =
                     //         WsMessageContent::mark_as_seen(&messages, &state.pg_pool).await
@@ -359,38 +383,45 @@ async fn handle_socket_for_messages(
 /// ユーザー間で共有されるメッセージの種類。
 ///
 /// WSメッセージの中には、部屋の全員に送信しなければならないデータ（つまり送信）や、
-/// クライアント側（MessagesRetrieved）
-/// またはサーバー側（RetrieveMessages）で実行すべきアクションを含むものがあります。
+/// クライアント側（OldMessagesRetrieved）
+/// またはサーバー側（RequestOldMessages）で実行すべきアクションを含むものがあります。
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "camelCase")]
 pub enum WsMessage {
     /// アプリケーションの全契約者間で共有されるコンテンツ。
-    Send(WsMessageContent),
+    ///
+    /// { "send": { "content": "メッセージの内容" } } を送信する
+    Send(MessagePayload),
     /// クライアント側で表示されるコンテンツ。
-    Receive(WsMessageContent),
+    Receive(MessageView),
     /// クライアントがルームの全メッセージを取得するために送信するアクション。
     ///
     /// 接続してきたクライアントが過去のメッセージを取得する際に使用する
-    RetrieveMessages(Uuid),
+    ///
+    /// { "retrieveMessages": null } を送信する
+    RequestOldMessages,
     /// すべてのメッセージが取得され、クライアントに送信されたことを知らせるために、サーバーから送信される情報。
-    MessagesRetrieved(Vec<WsMessageContent>),
+    OldMessagesRetrieved {
+        messages: Vec<MessageView>,
+        user_id: i32,
+    },
     /// ユーザーがメッセージを見たことを示す。
-    MessagesSeen(Vec<Uuid>),
+    MessagesSeen(Vec<i32>),
     /// 当事者の一方が接続を終了させたいと考えていることを意識してください。
     Close,
     /// 接続を閉じないように生かす。
     ClientKeepAlive,
     /// メッセージを見たことを知らせる。
-    Seen(Vec<Uuid>),
+    Seen(Vec<i32>),
 }
 
-/// WS内部でクライアントとサーバアプリケーション間の通信に使用される規格。
+/// ユーザーから受け取るメッセージの型
 #[derive(
     Debug, Clone, Serialize, Deserialize, derivative::Derivative, PartialEq, Eq, Hash, sqlx::FromRow,
 )]
 #[derivative(Default)]
 #[serde(rename_all = "camelCase")]
-pub struct WsMessageContent {
+pub struct MessagePayload {
     /// メッセージの識別子で、一意でなければならない。
     // #[derivative(Default(value = "Uuid::new_v4()"))]
     // pub uuid: Uuid,
@@ -411,8 +442,8 @@ pub struct WsMessageContent {
     pub content: String,
 }
 
-impl WsMessageContent {
-    fn new(content: String) -> Self {
-        Self { content }
-    }
-}
+// impl MessagePayload {
+//     fn new(content: String) -> Self {
+//         Self { content }
+//     }
+// }
