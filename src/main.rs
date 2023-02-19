@@ -4,6 +4,7 @@ use std::{
 };
 
 use axum::{
+    http::{header::CONTENT_TYPE, HeaderValue},
     routing::{delete, get, get_service, post},
     Router,
 };
@@ -14,7 +15,11 @@ use repositories::{
     follow::FollowRepositoryForDb, message::MessageRepositoryForDb, room::RoomRepositoryForDb,
     room_member::RoomMemberRepositoryForDb,
 };
-use tower_http::services::ServeDir;
+use tower_http::{
+    cors::CorsLayer,
+    services::ServeDir,
+};
+use http::Method;
 
 use crate::{
     constants::database_url,
@@ -118,6 +123,13 @@ async fn main() {
             "/static",
             get_service(ServeDir::new("static"))
                 .handle_error(|_| async { CustomError::FileNotFound }),
+        )
+        .layer(
+            CorsLayer::new()
+                .allow_origin("http://localhost:5173".parse::<HeaderValue>().unwrap())
+                .allow_methods(vec![Method::GET, Method::POST, Method::DELETE])
+                .allow_headers(vec![CONTENT_TYPE])
+                .allow_credentials(true),
         )
         .with_state(shared_state); // 受信するすべてのリクエストのExtensionにオブジェクトを挿入するミドルウェアを追加
 

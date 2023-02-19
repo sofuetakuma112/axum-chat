@@ -37,6 +37,8 @@ tower-http = { version = "0.3.5", features = [
     "fs",
     "trace",
     "util",
+    "cors",
 ] }
 base64 = "0.21.0"
 image = "0.24.5"
+http = "0.2.9"
