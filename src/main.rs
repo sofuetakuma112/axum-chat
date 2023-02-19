@@ -27,6 +27,7 @@ mod request;
 mod jwt;
 mod repositories;
 mod views;
+mod services;
 
 static KEYS: Lazy<Keys> = Lazy::new(|| {
     let secret = std::env::var("JWT_SECRET").expect("JWT_SECRET must be set");

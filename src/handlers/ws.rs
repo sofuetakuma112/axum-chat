@@ -13,6 +13,7 @@ use crate::{
         message::MessageRepository, room_member::RoomMemberRepository, user::UserRepository,
     },
     request::Claims,
+    services::messages::list_messages,
     views::message::Message as MessageView,
     AppState,
 };
@@ -26,7 +27,6 @@ use axum::{
 };
 use futures::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use tokio::sync::broadcast;
 
 pub async fn ws_test_handler(
@@ -240,13 +240,6 @@ pub async fn messages_handler(
 }
 
 /// ソケットハンドラ
-///
-/// # 引数
-///
-/// - socket : クライアントとサーバー間の通信に使用される構造体。
-/// - state : スレッド間で共有されるデータ。
-/// - room : ルーム名。
-/// - user : 接続されているユーザーの情報。
 async fn handle_socket_for_messages(
     socket: WebSocket,
     claims: Claims,
@@ -329,25 +322,12 @@ async fn handle_socket_for_messages(
                     }
                     WsMessage::RequestOldMessages => {
                         // 新しく接続してきたクライアントに対して、過去のメッセージをDBから取得して送信する
-                        // TODO: handlers/messages.rs のget_messagesと処理が重複しているのでサービスに切り出す
-                        let messages = state.message_repository.find_by_room_id(room_id).await;
-                        let user_ids = messages
-                            .iter()
-                            .map(|message| message.user_id)
-                            .collect::<Vec<i32>>();
-                        let users = state.user_repository.find(&user_ids).await;
-                        let messages = messages
-                            .into_iter()
-                            .map(|x| {
-                                let posted_user = users
-                                    .iter()
-                                    .find(|&user| user.id.unwrap() == x.user_id)
-                                    .unwrap();
-                                // .into() を呼び出し、Messageビューに変換している
-                                // Fromトレイトの実装を利用している
-                                (x, posted_user).into()
-                            })
-                            .collect::<Vec<MessageView>>();
+                        let messages = list_messages(
+                            state.message_repository.clone(),
+                            state.user_repository.clone(),
+                            room_id,
+                        )
+                        .await;
 
                         let _ = tx.send(WsMessage::OldMessagesRetrieved {
                             messages,
@@ -398,7 +378,7 @@ pub enum WsMessage {
     ///
     /// 接続してきたクライアントが過去のメッセージを取得する際に使用する
     ///
-    /// { "retrieveMessages": null } を送信する
+    /// { "requestOldMessages": null } を送信する
     RequestOldMessages,
     /// すべてのメッセージが取得され、クライアントに送信されたことを知らせるために、サーバーから送信される情報。
     OldMessagesRetrieved {
@@ -422,28 +402,6 @@ pub enum WsMessage {
 #[derivative(Default)]
 #[serde(rename_all = "camelCase")]
 pub struct MessagePayload {
-    /// メッセージの識別子で、一意でなければならない。
-    // #[derivative(Default(value = "Uuid::new_v4()"))]
-    // pub uuid: Uuid,
-    /// メッセージの作成者。
-    ///
-    /// メッセージがサーバーから発信された場合は空です。
-    // #[sqlx(flatten)]
-    // pub author: PartialUser,
-    /// メッセージが発信されたとき。
-    // #[derivative(Default(value = "chrono::offset::Utc::now()"))]
-    // pub timestamp: DateTime<Utc>,
-    /// メッセージが発信された部屋。
-    // pub room: String,
-    /// メッセージを受信したかどうか。
-    // pub reception_status: WsReceptionStatus,
-
     /// メッセージの内容です。
     pub content: String,
 }
-
-// impl MessagePayload {
-//     fn new(content: String) -> Self {
-//         Self { content }
-//     }
-// }

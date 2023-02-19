@@ -15,7 +15,7 @@ use crate::{
         message::MessageRepository, room_member::RoomMemberRepository, user::UserRepository,
     },
     request::Claims,
-    views::message::Message,
+    services::messages::list_messages,
     AppState,
 };
 
@@ -34,27 +34,12 @@ pub async fn get_messages(
     let is_room_member = room_members.iter().any(|x| x.member_id == claims.user_id);
 
     if is_room_member {
-        // room_idのルームの全てのメッセージを取得する
-        let messages = state.message_repository.find_by_room_id(room_id).await;
-        // 各メッセージの送信ユーザーを取得する
-        let user_ids = messages
-            .iter()
-            .map(|message| message.user_id)
-            .collect::<Vec<i32>>();
-        let users = state.user_repository.find(&user_ids).await;
-
-        let messages = messages
-            .into_iter()
-            .map(|x| {
-                let posted_user = users
-                    .iter()
-                    .find(|&user| user.id.unwrap() == x.user_id)
-                    .unwrap();
-                // .into() を呼び出し、Messageビューに変換している
-                // Fromトレイトの実装を利用している
-                (x, posted_user).into()
-            })
-            .collect::<Vec<Message>>();
+        let messages = list_messages(
+            state.message_repository.clone(),
+            state.user_repository.clone(),
+            room_id,
+        )
+        .await;
 
         Ok((
             StatusCode::OK,
