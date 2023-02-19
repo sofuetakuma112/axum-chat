@@ -12,7 +12,7 @@ use crate::{
     entities::messages::Message as MessageEntity,
     errors::CustomError,
     repositories::{
-        message::MessageRepository, room_member::RoomMemberRepository, user::UserRepository,
+        message::MessageRepository, room_member::RoomMemberRepository,
     },
     request::Claims,
     services::messages::list_messages,

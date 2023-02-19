@@ -11,14 +11,14 @@ pub struct User {
 
 impl User {
     // DBから取得したRowをUserエンティティに変換する用
-    pub fn new(id: i32, email: String, hashed_password: String, display_name: String) -> User {
-        User {
-            id: Some(id),
-            email,
-            hashed_password,
-            display_name,
-        }
-    }
+    // pub fn new(id: i32, email: String, hashed_password: String, display_name: String) -> User {
+    //     User {
+    //         id: Some(id),
+    //         email,
+    //         hashed_password,
+    //         display_name,
+    //     }
+    // }
 
     // DBに挿入するためにUserエンティティを作成する用
     pub fn create(email: &str, password: &str, display_name: &str) -> User {
@@ -30,9 +30,9 @@ impl User {
         }
     }
 
-    pub fn id(&self) -> Option<i32> {
-        self.id
-    }
+    // pub fn id(&self) -> Option<i32> {
+    //     self.id
+    // }
 
     /// ハッシュ化済みのパスワードと平文のパスワードを比較する
     pub fn matches_password(&self, password: &str) -> bool {

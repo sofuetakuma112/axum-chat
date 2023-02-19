@@ -11,21 +11,21 @@ pub struct Message {
 
 impl Message {
     // DBから取得したRowをMessageエンティティに変換する用
-    pub fn new(
-        id: i32,
-        room_id: i32,
-        user_id: i32,
-        message: String,
-        created_at: chrono::NaiveDateTime,
-    ) -> Message {
-        Message {
-            id: Some(id),
-            room_id,
-            user_id,
-            message,
-            created_at: Some(created_at),
-        }
-    }
+    // pub fn new(
+    //     id: i32,
+    //     room_id: i32,
+    //     user_id: i32,
+    //     message: String,
+    //     created_at: chrono::NaiveDateTime,
+    // ) -> Message {
+    //     Message {
+    //         id: Some(id),
+    //         room_id,
+    //         user_id,
+    //         message,
+    //         created_at: Some(created_at),
+    //     }
+    // }
 
     // DBに挿入するためにMessageエンティティを作成する用
     pub fn create(room_id: i32, user_id: i32, message: String) -> Message {

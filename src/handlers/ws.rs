@@ -209,9 +209,9 @@ impl DerefMut for WsRooms {
 pub async fn rooms_handler(
     ws: WebSocketUpgrade,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    Path(user_id): Path<i32>,
-    State(state): State<Arc<AppState>>,
-    claims: Claims,
+    Path(_user_id): Path<i32>,
+    State(_state): State<Arc<AppState>>,
+    _claims: Claims,
 ) -> impl IntoResponse {
     ws.on_upgrade(move |socket| handle_socket(socket, addr))
 }
