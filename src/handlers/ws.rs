@@ -13,7 +13,7 @@ use crate::{
         message::MessageRepository, room_member::RoomMemberRepository, user::UserRepository,
     },
     request::Claims,
-    services::{messages::list_messages, php::upload_image},
+    services::{messages::list_messages, php::upload_image_v2},
     views::message::Message as MessageView,
     AppState,
 };
@@ -25,7 +25,6 @@ use axum::{
     },
     response::IntoResponse,
 };
-use base64::{engine::general_purpose, Engine};
 use futures::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
@@ -301,21 +300,71 @@ async fn handle_socket_for_messages(
 
     // このタスクは、クライアントからメッセージを受信し、購読者にブロードキャストする。
     let mut recv_from_listener_task = tokio::spawn(async move {
-        while let Some(Ok(Message::Text(text))) = receiver.next().await {
-            if let Ok(msg) = serde_json::from_str(text.as_str()) {
-                match msg {
-                    // WsMessage::Close => break,
-                    // WsMessage::ClientKeepAlive => continue,
-                    WsMessage::Send(ws_message) => {
-                        let message = MessageEntity::create(
-                            room_id,
-                            user_id,
-                            ws_message.content.clone(),
-                            MessageType::Text,
-                        );
-                        // TODO: リポジトリ層でエラーを返すようにしたらエラーハンドリングする
-                        let message = state.message_repository.store(&message).await;
+        loop {
+            match receiver.next().await {
+                Some(Ok(Message::Text(text))) => {
+                    // TODO: base64エンコードで画像を受け取るのはファイルのサイズ制限があるので、Message::Binaryで受け取るよう修正する
+                    if let Ok(msg) = serde_json::from_str(text.as_str()) {
+                        match msg {
+                            // WsMessage::Close => break,
+                            // WsMessage::ClientKeepAlive => continue,
+                            WsMessage::Send(ws_message) => {
+                                let message = MessageEntity::create(
+                                    room_id,
+                                    user_id,
+                                    ws_message.content.clone(),
+                                    MessageType::Text,
+                                );
+                                // TODO: リポジトリ層でエラーを返すようにしたらエラーハンドリングする
+                                let message = state.message_repository.store(&message).await;
 
+                                let user = state
+                                    .user_repository
+                                    .find_by_user_id(user_id)
+                                    .await
+                                    .unwrap();
+
+                                let message: MessageView = (message, &user).into();
+                                let _ = tx.send(WsMessage::Receive(message));
+                            }
+                            WsMessage::RequestOldMessages => {
+                                // 新しく接続してきたクライアントに対して、過去のメッセージをDBから取得して送信する
+                                let messages = list_messages(
+                                    state.message_repository.clone(),
+                                    state.user_repository.clone(),
+                                    room_id,
+                                )
+                                .await;
+
+                                let _ = tx.send(WsMessage::OldMessagesRetrieved {
+                                    messages,
+                                    user_id, // 送信先のuser_id
+                                });
+                            }
+                            // WsMessage::Seen(messages) => {
+                            //     if let Err(e) =
+                            //         WsMessageContent::mark_as_seen(&messages, &state.pg_pool).await
+                            //     {
+                            //         tracing::error!(
+                            //             "An error happened while updating the messsages : {:?}.",
+                            //             e
+                            //         );
+                            //     } else {
+                            //         let _ = tx.send(
+                            //             serde_json::to_string(&WsMessage::MessagesSeen(messages)).unwrap(),
+                            //         );
+                            //     }
+                            // }
+                            _ => {}
+                        }
+                    }
+                }
+                Some(Ok(Message::Binary(binary))) => {
+                    if let Ok(image_path) = upload_image_v2(&binary).await {
+                        // 画像パスをmessagesに保存する
+                        let message =
+                            MessageEntity::create(room_id, user_id, image_path, MessageType::Image);
+                        let message = state.message_repository.store(&message).await;
                         let user = state
                             .user_repository
                             .find_by_user_id(user_id)
@@ -323,61 +372,10 @@ async fn handle_socket_for_messages(
                             .unwrap();
 
                         let message: MessageView = (message, &user).into();
-                        let _ = tx.send(WsMessage::Receive(message));
+                        tx.send(WsMessage::Receive(message)).unwrap();
                     }
-                    WsMessage::SendImage(image_payload) => {
-                        if let Ok(image) = general_purpose::STANDARD.decode(image_payload.base64) {
-                            let image_path = upload_image(&image, image_payload.extension).await;
-                            // 画像パスをmessagesに保存する
-                            let message = MessageEntity::create(
-                                room_id,
-                                user_id,
-                                image_path,
-                                MessageType::Image,
-                            );
-                            let message = state.message_repository.store(&message).await;
-                            let user = state
-                                .user_repository
-                                .find_by_user_id(user_id)
-                                .await
-                                .unwrap();
-
-                            let message: MessageView = (message, &user).into();
-                            tx.send(WsMessage::Receive(message)).unwrap();
-                        } else {
-                            unimplemented!()
-                        }
-                    }
-                    WsMessage::RequestOldMessages => {
-                        // 新しく接続してきたクライアントに対して、過去のメッセージをDBから取得して送信する
-                        let messages = list_messages(
-                            state.message_repository.clone(),
-                            state.user_repository.clone(),
-                            room_id,
-                        )
-                        .await;
-
-                        let _ = tx.send(WsMessage::OldMessagesRetrieved {
-                            messages,
-                            user_id, // 送信先のuser_id
-                        });
-                    }
-                    // WsMessage::Seen(messages) => {
-                    //     if let Err(e) =
-                    //         WsMessageContent::mark_as_seen(&messages, &state.pg_pool).await
-                    //     {
-                    //         tracing::error!(
-                    //             "An error happened while updating the messsages : {:?}.",
-                    //             e
-                    //         );
-                    //     } else {
-                    //         let _ = tx.send(
-                    //             serde_json::to_string(&WsMessage::MessagesSeen(messages)).unwrap(),
-                    //         );
-                    //     }
-                    // }
-                    _ => {}
                 }
+                _ => {}
             }
         }
     });

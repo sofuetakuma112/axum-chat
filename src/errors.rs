@@ -16,6 +16,7 @@ pub enum CustomError {
     UserNotFound,
     AccessingUnauthorisedResources,
     FileNotFound,
+    WrongFileExtension,
 }
 
 impl IntoResponse for CustomError {
@@ -42,9 +43,11 @@ impl IntoResponse for CustomError {
                 StatusCode::UNPROCESSABLE_ENTITY,
                 "権限の無いリソースへのアクセスです。",
             ),
-            CustomError::FileNotFound => {
-                (StatusCode::NOT_FOUND, "ファイルがありません。")
-            }
+            CustomError::FileNotFound => (StatusCode::NOT_FOUND, "ファイルがありません。"),
+            CustomError::WrongFileExtension => (
+                StatusCode::UNSUPPORTED_MEDIA_TYPE,
+                "画像ファイルを選択してください。",
+            ),
         };
         let body = Json(json!({
             "message": error_message,
