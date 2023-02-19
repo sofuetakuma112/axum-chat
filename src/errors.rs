@@ -15,6 +15,7 @@ pub enum CustomError {
     CannotEncodeToken(jsonwebtoken::errors::Error),
     UserNotFound,
     AccessingUnauthorisedResources,
+    FileNotFound,
 }
 
 impl IntoResponse for CustomError {
@@ -41,6 +42,9 @@ impl IntoResponse for CustomError {
                 StatusCode::UNPROCESSABLE_ENTITY,
                 "権限の無いリソースへのアクセスです。",
             ),
+            CustomError::FileNotFound => {
+                (StatusCode::NOT_FOUND, "ファイルがありません。")
+            }
         };
         let body = Json(json!({
             "message": error_message,

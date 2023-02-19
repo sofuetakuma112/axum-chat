@@ -29,11 +29,12 @@ impl MessageRepository for MessageRepositoryForDb {
 
     async fn store(&self, message: &Message) -> Message {
         sqlx::query_as::<_, Message>(
-            "INSERT INTO messages (user_id, room_id, message) VALUES ($1, $2, $3) RETURNING *",
+            "INSERT INTO messages (user_id, room_id, message, message_type) VALUES ($1, $2, $3, $4) RETURNING *",
         )
         .bind(&message.user_id)
         .bind(&message.room_id)
         .bind(&message.message)
+        .bind(&message.message_type)
         .fetch_one(&self.pool)
         .await
         .unwrap()

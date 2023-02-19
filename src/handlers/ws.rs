@@ -7,13 +7,13 @@ use std::{
 };
 
 use crate::{
-    entities::messages::Message as MessageEntity,
+    entities::messages::{Message as MessageEntity, MessageType},
     errors::CustomError,
     repositories::{
         message::MessageRepository, room_member::RoomMemberRepository, user::UserRepository,
     },
     request::Claims,
-    services::messages::list_messages,
+    services::{messages::list_messages, php::upload_image},
     views::message::Message as MessageView,
     AppState,
 };
@@ -25,6 +25,7 @@ use axum::{
     },
     response::IntoResponse,
 };
+use base64::{engine::general_purpose, Engine};
 use futures::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
@@ -306,8 +307,12 @@ async fn handle_socket_for_messages(
                     // WsMessage::Close => break,
                     // WsMessage::ClientKeepAlive => continue,
                     WsMessage::Send(ws_message) => {
-                        let message =
-                            MessageEntity::create(room_id, user_id, ws_message.content.clone());
+                        let message = MessageEntity::create(
+                            room_id,
+                            user_id,
+                            ws_message.content.clone(),
+                            MessageType::Text,
+                        );
                         // TODO: リポジトリ層でエラーを返すようにしたらエラーハンドリングする
                         let message = state.message_repository.store(&message).await;
 
@@ -319,6 +324,29 @@ async fn handle_socket_for_messages(
 
                         let message: MessageView = (message, &user).into();
                         let _ = tx.send(WsMessage::Receive(message));
+                    }
+                    WsMessage::SendImage(image_payload) => {
+                        if let Ok(image) = general_purpose::STANDARD.decode(image_payload.base64) {
+                            let image_path = upload_image(&image, image_payload.extension).await;
+                            // 画像パスをmessagesに保存する
+                            let message = MessageEntity::create(
+                                room_id,
+                                user_id,
+                                image_path,
+                                MessageType::Image,
+                            );
+                            let message = state.message_repository.store(&message).await;
+                            let user = state
+                                .user_repository
+                                .find_by_user_id(user_id)
+                                .await
+                                .unwrap();
+
+                            let message: MessageView = (message, &user).into();
+                            tx.send(WsMessage::Receive(message)).unwrap();
+                        } else {
+                            unimplemented!()
+                        }
                     }
                     WsMessage::RequestOldMessages => {
                         // 新しく接続してきたクライアントに対して、過去のメッセージをDBから取得して送信する
@@ -368,10 +396,12 @@ async fn handle_socket_for_messages(
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "camelCase")]
 pub enum WsMessage {
-    /// アプリケーションの全契約者間で共有されるコンテンツ。
+    /// ユーザーから送信されたメッセージ
     ///
     /// { "send": { "content": "メッセージの内容" } } を送信する
     Send(MessagePayload),
+    /// ユーザーから送信された画像ファイル
+    SendImage(ImagePayload), // Jsonでバイナリを送信する際はbase64エンコードされるのでString型で扱う
     /// クライアント側で表示されるコンテンツ。
     Receive(MessageView),
     /// クライアントがルームの全メッセージを取得するために送信するアクション。
@@ -393,6 +423,8 @@ pub enum WsMessage {
     ClientKeepAlive,
     /// メッセージを見たことを知らせる。
     Seen(Vec<i32>),
+    /// エラーメッセージを知らせる
+    ReceiveError(WsError),
 }
 
 /// ユーザーから受け取るメッセージの型
@@ -404,4 +436,20 @@ pub enum WsMessage {
 pub struct MessagePayload {
     /// メッセージの内容です。
     pub content: String,
+}
+
+#[derive(
+    Debug, Clone, Serialize, Deserialize, derivative::Derivative, PartialEq, Eq, Hash, sqlx::FromRow,
+)]
+#[derivative(Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ImagePayload {
+    /// メッセージの内容です。
+    pub base64: String,
+    pub extension: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, derivative::Derivative, PartialEq, Eq, Hash)]
+pub enum WsError {
+    InvalidImage,
 }

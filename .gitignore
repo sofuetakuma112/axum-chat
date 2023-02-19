@@ -1,3 +1,4 @@
 /target
 .env
 /old_src
+/static

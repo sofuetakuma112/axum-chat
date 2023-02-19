@@ -9,11 +9,9 @@ use serde::Deserialize;
 use serde_json::json;
 
 use crate::{
-    entities::messages::Message as MessageEntity,
+    entities::messages::{Message as MessageEntity, MessageType},
     errors::CustomError,
-    repositories::{
-        message::MessageRepository, room_member::RoomMemberRepository,
-    },
+    repositories::{message::MessageRepository, room_member::RoomMemberRepository},
     request::Claims,
     services::messages::list_messages,
     AppState,
@@ -69,7 +67,8 @@ pub async fn create_message(
     let is_room_member = room_members.iter().any(|x| x.member_id == claims.user_id);
 
     if is_room_member {
-        let message = MessageEntity::create(room_id, user_id, payload.message.clone());
+        let message =
+            MessageEntity::create(room_id, user_id, payload.message.clone(), MessageType::Text);
         state.message_repository.store(&message).await;
 
         Ok((

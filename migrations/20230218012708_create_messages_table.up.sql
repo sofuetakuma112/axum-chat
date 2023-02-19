@@ -4,5 +4,6 @@ CREATE TABLE IF NOT EXISTS messages (
     user_id int NOT NULL references users(id),
     room_id int NOT NULL references rooms(id),
     message text NOT NULL,
+    message_type int NOT NULL,
     created_at timestamp NOT NULL default CURRENT_TIMESTAMP
 )
