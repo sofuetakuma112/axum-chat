@@ -1,9 +1,9 @@
 import React from 'react'
-import { TextInputWithLabel } from './TextInputWithLabel'
+import { TextInputWithLabel } from '../Forms/TextInputWithLabel'
 import { useForm, SubmitHandler } from 'react-hook-form'
 import { LoginPayload } from '../../hooks/useAuth'
 import { Link } from 'react-router-dom'
-import { Button } from './Button'
+import { Button } from '../Forms/Button'
 
 type Inputs = {
     email: string

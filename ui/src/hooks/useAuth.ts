@@ -3,6 +3,7 @@ import axios from '../utils/axios'
 import { useNavigate } from 'react-router-dom'
 
 export type User = {
+  avatarImageUrl: string
   id: number
   name: string
   email: string
@@ -53,7 +54,7 @@ const useAuth = () => {
       setUser(user)
     } catch (error) {
       console.log(error)
-      logout() //追加
+      // logout()
     }
   }, [logout])
 

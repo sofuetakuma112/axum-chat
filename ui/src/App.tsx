@@ -1,6 +1,8 @@
+import { isMobile } from "react-device-detect"
 import { Route, Routes } from "react-router-dom"
 import { ProtectedRoute } from "./components/ProtectedRoute"
-import { Chat } from "./pages/chat"
+import { ChatForPc } from "./pages/chat-for-pc"
+import { ChatForMobile } from "./pages/chat-for-mobile"
 import { Login } from "./pages/login"
 import { Signup } from "./pages/signup"
 
@@ -10,9 +12,10 @@ function App() {
     <Route
       path="/"
       element={
-        <ProtectedRoute>
-          <Chat />
-        </ProtectedRoute>
+        isMobile ? <ChatForMobile /> : <ChatForPc />
+        // <ProtectedRoute>
+        //   <Chat />
+        // </ProtectedRoute>
       }
     />
     <Route path="/signup" element={<Signup />} />
