@@ -5,6 +5,7 @@ import { Message, Talk } from '../components/Talk'
 import { TalkForm } from '../components/Talk/TalkForm'
 import { Room } from '../types/type'
 import { Friends } from '../components/Friends'
+import { Setting } from '../components/Setting'
 
 export const ChatForMobile: React.FC = () => {
   const [connectionClosed, setConnectionClosed] = useState(false)
@@ -51,7 +52,7 @@ export const ChatForMobile: React.FC = () => {
                 currentRoomId={currentRoomId}
               />
             )}
-            {currentMenu === 'Settings' && <></>}
+            {currentMenu === 'Settings' && <Setting />}
           </div>
           <FooterMenuBar
             currentMenu={currentMenu}
