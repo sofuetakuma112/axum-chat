@@ -19,10 +19,10 @@ export const Header: React.FC<Props> = ({ handleClickHeaderIcon }) => {
           onClick={() => handleClickHeaderIcon('Search')}
           className="flex items-center justify-center h-7 w-7 bg-gray-200 text-gray-500 rounded-full"
         >
-          <UserPlusIcon />
+          <UserPlusIcon size='sm' />
         </button>
         <button className="flex items-center justify-center h-7 w-7 bg-gray-200 text-gray-500 rounded-full">
-          <SearchIcon />
+          <SearchIcon size='sm' />
         </button>
       </div>
     </div>

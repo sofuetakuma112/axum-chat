@@ -34,10 +34,18 @@ impl UserRepository for UserRepositoryForDb {
     }
 
     /// user_idを使ってusersからユーザーを検索する
-    async fn find_by_user_id(&self, user_id: i32) -> Option<User> {
+    async fn find_by_id(&self, user_id: i32) -> Option<User> {
         sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = $1")
             .bind(user_id)
             .fetch_optional(&self.pool)
+            .await
+            .unwrap()
+    }
+
+    async fn find_by_user_id(&self, user_id: &str) -> Vec<User> {
+        sqlx::query_as::<_, User>(format!("SELECT * FROM users WHERE user_id LIKE '%{}%'", user_id).as_str())
+            // .bind(user_id)
+            .fetch_all(&self.pool)
             .await
             .unwrap()
     }
@@ -65,7 +73,8 @@ impl UserRepository for UserRepositoryForDb {
 #[async_trait]
 pub trait UserRepository: Clone + std::marker::Send + std::marker::Sync + 'static {
     async fn find(&self, ids: &Vec<i32>) -> Vec<User>;
-    async fn find_by_user_id(&self, user_id: i32) -> Option<User>;
+    async fn find_by_id(&self, user_id: i32) -> Option<User>;
+    async fn find_by_user_id(&self, user_id: &str) -> Vec<User>;
     async fn find_by_email(&self, email: &str) -> Option<User>;
     async fn store(&self, entity: &User) -> User;
 }

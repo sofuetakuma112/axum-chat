@@ -20,7 +20,7 @@ pub async fn get_user(
     claims: Claims,
     State(state): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, CustomError> {
-    if let Some(user) = state.user_repository.find_by_user_id(claims.user_id).await {
+    if let Some(user) = state.user_repository.find_by_id(claims.user_id).await {
         let user_view: User = user.into();
         Ok((StatusCode::OK, response::Json(json!({ "user": user_view }))))
     } else {

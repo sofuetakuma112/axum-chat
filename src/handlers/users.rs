@@ -1,16 +1,32 @@
 use std::sync::Arc;
 
 use axum::{
-    extract::{Path, State},
+    extract::{Path, State, Query},
     http::StatusCode,
     response::{self, IntoResponse},
 };
+use serde::Deserialize;
 use serde_json::json;
 
 use crate::{
-    errors::CustomError, repositories::follow::FollowRepository, request::Claims,
+    errors::CustomError, repositories::{follow::FollowRepository, user::UserRepository}, request::Claims,
     views::user::User, AppState,
 };
+
+#[axum_macros::debug_handler]
+pub async fn get_users(
+    _claims: Claims,
+    Query(payload): Query<GetUsersPayload>,
+    State(state): State<Arc<AppState>>,
+) -> Result<impl IntoResponse, CustomError> {
+    let users = state.user_repository.find_by_user_id(payload.user_id.as_str()).await;
+    Ok((
+        StatusCode::OK,
+        response::Json(
+            json!({ "users": users.into_iter().map(|user| User::from(user)).collect::<Vec<User>>() }),
+        ),
+    ))
+}
 
 /// user_idのユーザーをフォローしているユーザー一覧を返す
 #[axum_macros::debug_handler]
@@ -82,4 +98,9 @@ pub async fn unfollow(
         StatusCode::NO_CONTENT,
         response::Json(json!({ "message": "フォローを解除しました。" })),
     ))
+}
+
+#[derive(Deserialize)]
+pub struct GetUsersPayload {
+    user_id: String
 }

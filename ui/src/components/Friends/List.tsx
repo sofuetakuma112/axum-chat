@@ -3,19 +3,20 @@ import { User } from '../../hooks/useAuth'
 import { Item } from './Item'
 
 type Props = {
-  friends: User[]
+  users: User[]
   handleClickFriend: (id: number) => void
 }
 
-export const List: React.FC<Props> = ({ friends, handleClickFriend }) => {
+export const List: React.FC<Props> = ({ users, handleClickFriend }) => {
   return (
     <div className="mt-2">
       <div className="flex flex-col -mx-4">
-        {friends.map((friend) => (
+        {users.map((user) => (
           <Item
-            id={friend.id}
-            name={friend.name}
-            avatarImageUrl={friend.avatarImageUrl}
+            key={user.id}
+            id={user.id}
+            name={user.name}
+            avatarImageUrl={user.avatarImageUrl}
             onClick={handleClickFriend}
           />
         ))}

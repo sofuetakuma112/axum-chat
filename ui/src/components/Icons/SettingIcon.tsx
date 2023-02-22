@@ -1,16 +1,21 @@
+import classNames from 'classnames'
 import { ComponentPropsWithoutRef } from 'react'
+import { Size } from '../../types/style'
+import { sizeToClassName } from '../../utils/style'
 
-type Props = ComponentPropsWithoutRef<'svg'>
+type Props = {
+  size?: Size
+} & ComponentPropsWithoutRef<'svg'>
 
-export const SettingIcon: React.FC<Props> = (props) => {
+export const SettingIcon: React.FC<Props> = ({ size = "md", ...rest }) => {
   return (
     <svg
-      className="w-6 h-6"
+    className={classNames(sizeToClassName(size))}
       fill="none"
       stroke="currentColor"
       viewBox="0 0 24 24"
       xmlns="http://www.w3.org/2000/svg"
-      {...props}
+      {...rest}
     >
       <path
         strokeLinecap="round"

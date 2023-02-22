@@ -4,9 +4,11 @@ use sha2::{Digest, Sha256};
 #[derive(sqlx::FromRow, Serialize)]
 pub struct User {
     pub id: Option<i32>,
+    pub user_id: Option<String>,
+    pub name: String,
+    pub avatar_file_name: Option<String>,
     pub email: String,
     pub hashed_password: String,
-    pub name: String,
 }
 
 impl User {
@@ -24,9 +26,11 @@ impl User {
     pub fn create(email: &str, password: &str, name: &str) -> User {
         User {
             id: None,
+            user_id: None,
+            name: name.to_string(),
+            avatar_file_name: None,
             email: email.to_string(),
             hashed_password: to_sha256(password),
-            name: name.to_string(),
         }
     }
 

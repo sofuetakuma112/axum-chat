@@ -1,16 +1,21 @@
+import classNames from 'classnames'
 import React, { ComponentPropsWithoutRef } from 'react'
+import { Size } from '../../types/style'
+import { sizeToClassName } from '../../utils/style'
 
-type Props = ComponentPropsWithoutRef<'svg'>
+type Props = {
+  size?: Size
+} & ComponentPropsWithoutRef<'svg'>
 
-export const UserPlusIcon: React.FC<Props> = (props) => {
+export const UserPlusIcon: React.FC<Props> = ({ size = "md", ...rest }) => {
   return (
     <svg
-      className="w-4 h-4 stroke-current"
+      className={classNames('stroke-current', sizeToClassName(size))}
       fill="none"
       stroke="currentColor"
       viewBox="0 0 24 24"
       xmlns="http://www.w3.org/2000/svg"
-      {...props}
+      {...rest}
     >
       <path
         strokeLinecap="round"

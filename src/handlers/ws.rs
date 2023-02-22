@@ -320,7 +320,7 @@ async fn handle_socket_for_messages(
 
                                 let user = state
                                     .user_repository
-                                    .find_by_user_id(user_id)
+                                    .find_by_id(user_id)
                                     .await
                                     .unwrap();
 
@@ -367,7 +367,7 @@ async fn handle_socket_for_messages(
                         let message = state.message_repository.store(&message).await;
                         let user = state
                             .user_repository
-                            .find_by_user_id(user_id)
+                            .find_by_id(user_id)
                             .await
                             .unwrap();
 
